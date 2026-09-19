@@ -21,10 +21,12 @@ public class InternshipPhaseService {
         this.phaseRepository = phaseRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<InternshipPhaseDTO> getAllPhases() {
         return phaseRepository.findAll().stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public InternshipPhaseDTO getPhaseById(Integer phaseId) {
         InternshipPhase phase = phaseRepository.findById(phaseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Internship phase not found with id: " + phaseId));
@@ -56,7 +58,8 @@ public class InternshipPhaseService {
         InternshipPhase phase = phaseRepository.findById(phaseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Internship phase not found with id: " + phaseId));
 
-        if (!phase.getPhaseName().equalsIgnoreCase(dto.getPhaseName()) && phaseRepository.existsByPhaseName(dto.getPhaseName())) {
+        if (!phase.getPhaseName().equalsIgnoreCase(dto.getPhaseName())
+                && phaseRepository.existsByPhaseName(dto.getPhaseName())) {
             throw new DuplicateResourceException("Internship phase name already exists: " + dto.getPhaseName());
         }
 

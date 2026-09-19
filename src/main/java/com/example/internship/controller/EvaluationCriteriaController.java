@@ -4,11 +4,10 @@ import com.example.internship.dto.ApiResponse;
 import com.example.internship.dto.EvaluationCriteriaDTO;
 import com.example.internship.service.EvaluationCriteriaService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/evaluation_criteria")
@@ -27,19 +26,23 @@ public class EvaluationCriteriaController {
     }
 
     @GetMapping("/{criterionId}")
-    public ResponseEntity<ApiResponse<EvaluationCriteriaDTO>> getCriterionById(@PathVariable Integer criterionId) {
+    public ResponseEntity<ApiResponse<EvaluationCriteriaDTO>> getCriterionById(
+            @PathVariable Integer criterionId) {
         EvaluationCriteriaDTO dto = criteriaService.getCriterionById(criterionId);
         return ResponseEntity.ok(ApiResponse.success(dto));
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<EvaluationCriteriaDTO>> createCriterion(@Valid @RequestBody EvaluationCriteriaDTO dto) {
+    public ResponseEntity<ApiResponse<EvaluationCriteriaDTO>> createCriterion(
+            @Valid @RequestBody EvaluationCriteriaDTO dto) {
         EvaluationCriteriaDTO created = criteriaService.createCriterion(dto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Evaluation criterion created", created));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Evaluation criterion created", created));
     }
 
     @PutMapping("/{criterionId}")
-    public ResponseEntity<ApiResponse<EvaluationCriteriaDTO>> updateCriterion(@PathVariable Integer criterionId, @Valid @RequestBody EvaluationCriteriaDTO dto) {
+    public ResponseEntity<ApiResponse<EvaluationCriteriaDTO>> updateCriterion(
+            @PathVariable Integer criterionId, @Valid @RequestBody EvaluationCriteriaDTO dto) {
         EvaluationCriteriaDTO updated = criteriaService.updateCriterion(criterionId, dto);
         return ResponseEntity.ok(ApiResponse.success("Evaluation criterion updated", updated));
     }

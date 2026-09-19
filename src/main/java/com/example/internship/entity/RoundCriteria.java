@@ -10,7 +10,7 @@ import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "round_criteria", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"round_id", "criterion_id"})
+        @UniqueConstraint(columnNames = { "round_id", "criterion_id" })
 })
 @Getter
 @Setter
@@ -32,7 +32,7 @@ public class RoundCriteria {
     @JoinColumn(name = "criterion_id", nullable = false)
     private EvaluationCriteria criterion;
 
-    @Column(name = "weight", nullable = false, precision = 3, scale = 2)
+    @Column(name = "weight", nullable = false, precision = 5, scale = 2)
     private BigDecimal weight;
 
     @CreationTimestamp

@@ -24,11 +24,13 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Transactional(readOnly = true)
     public List<UserDTO> getAllUsers(UserRole role) {
         List<User> users = (role != null) ? userRepository.findByRole(role) : userRepository.findAll();
         return users.stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public UserDTO getUserById(Integer userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));

@@ -19,16 +19,20 @@ public class AssessmentRoundService {
     private final AssessmentRoundRepository roundRepository;
     private final InternshipPhaseRepository phaseRepository;
 
-    public AssessmentRoundService(AssessmentRoundRepository roundRepository, InternshipPhaseRepository phaseRepository) {
+    public AssessmentRoundService(AssessmentRoundRepository roundRepository,
+            InternshipPhaseRepository phaseRepository) {
         this.roundRepository = roundRepository;
         this.phaseRepository = phaseRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<AssessmentRoundDTO> getAllRounds(Integer phaseId) {
-        List<AssessmentRound> rounds = (phaseId != null) ? roundRepository.findByPhase_PhaseId(phaseId) : roundRepository.findAll();
+        List<AssessmentRound> rounds = (phaseId != null) ? roundRepository.findByPhase_PhaseId(phaseId)
+                : roundRepository.findAll();
         return rounds.stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public AssessmentRoundDTO getRoundById(Integer roundId) {
         AssessmentRound round = roundRepository.findById(roundId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assessment round not found with id: " + roundId));
@@ -38,10 +42,16 @@ public class AssessmentRoundService {
     @Transactional
     public AssessmentRoundDTO createRound(AssessmentRoundDTO dto) {
         InternshipPhase phase = phaseRepository.findById(dto.getPhaseId())
-                .orElseThrow(() -> new ResourceNotFoundException("Internship phase not found with id: " + dto.getPhaseId()));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Internship phase not found with id: " + dto.getPhaseId()));
 
         if (dto.getEndDate().isBefore(dto.getStartDate())) {
             throw new BadRequestException("Round end date cannot be before start date");
+        }
+
+        if (dto.getStartDate().isBefore(phase.getStartDate()) || dto.getEndDate().isAfter(phase.getEndDate())) {
+            throw new BadRequestException("Round dates must be within phase period (" + phase.getStartDate() + " to "
+                    + phase.getEndDate() + ")");
         }
 
         AssessmentRound round = AssessmentRound.builder()
@@ -63,6 +73,12 @@ public class AssessmentRoundService {
 
         if (dto.getEndDate().isBefore(dto.getStartDate())) {
             throw new BadRequestException("Round end date cannot be before start date");
+        }
+
+        InternshipPhase phase = round.getPhase();
+        if (dto.getStartDate().isBefore(phase.getStartDate()) || dto.getEndDate().isAfter(phase.getEndDate())) {
+            throw new BadRequestException("Round dates must be within phase period (" + phase.getStartDate() + " to "
+                    + phase.getEndDate() + ")");
         }
 
         round.setRoundName(dto.getRoundName());

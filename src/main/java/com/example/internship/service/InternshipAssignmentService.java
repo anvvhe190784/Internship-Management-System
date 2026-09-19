@@ -10,6 +10,7 @@ import com.example.internship.repository.InternshipPhaseRepository;
 import com.example.internship.repository.MentorRepository;
 import com.example.internship.repository.StudentRepository;
 import com.example.internship.security.UserPrincipal;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,13 +26,17 @@ public class InternshipAssignmentService {
     private final MentorRepository mentorRepository;
     private final InternshipPhaseRepository phaseRepository;
 
-    public InternshipAssignmentService(InternshipAssignmentRepository assignmentRepository, StudentRepository studentRepository, MentorRepository mentorRepository, InternshipPhaseRepository phaseRepository) {
+    public InternshipAssignmentService(InternshipAssignmentRepository assignmentRepository,
+            StudentRepository studentRepository,
+            MentorRepository mentorRepository,
+            InternshipPhaseRepository phaseRepository) {
         this.assignmentRepository = assignmentRepository;
         this.studentRepository = studentRepository;
         this.mentorRepository = mentorRepository;
         this.phaseRepository = phaseRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<InternshipAssignmentDTO> getAllAssignments(Integer studentId, Integer mentorId, Integer phaseId) {
         UserPrincipal current = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
@@ -41,30 +46,22 @@ public class InternshipAssignmentService {
             mentorId = current.getUserId();
         }
 
-        List<InternshipAssignment> list;
-        if (studentId != null) {
-            list = assignmentRepository.findByStudent_StudentId(studentId);
-        } else if (mentorId != null) {
-            list = assignmentRepository.findByMentor_MentorId(mentorId);
-        } else if (phaseId != null) {
-            list = assignmentRepository.findByPhase_PhaseId(phaseId);
-        } else {
-            list = assignmentRepository.findAll();
-        }
-
+        List<InternshipAssignment> list = assignmentRepository.findWithFilters(studentId, mentorId, phaseId);
         return list.stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public InternshipAssignmentDTO getAssignmentById(Integer assignmentId) {
         InternshipAssignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found with id: " + assignmentId));
 
         UserPrincipal current = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (current.getRole() == UserRole.STUDENT && !assignment.getStudent().getStudentId().equals(current.getUserId())) {
-            throw new BadRequestException("Students can only view their own assignments");
+        if (current.getRole() == UserRole.STUDENT
+                && !assignment.getStudent().getStudentId().equals(current.getUserId())) {
+            throw new AccessDeniedException("Students can only view their own assignments");
         }
         if (current.getRole() == UserRole.MENTOR && !assignment.getMentor().getMentorId().equals(current.getUserId())) {
-            throw new BadRequestException("Mentors can only view their assigned students");
+            throw new AccessDeniedException("Mentors can only view their assigned students");
         }
 
         return mapToDTO(assignment);
@@ -79,7 +76,8 @@ public class InternshipAssignmentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Mentor not found with id: " + dto.getMentorId()));
 
         InternshipPhase phase = phaseRepository.findById(dto.getPhaseId())
-                .orElseThrow(() -> new ResourceNotFoundException("Internship phase not found with id: " + dto.getPhaseId()));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Internship phase not found with id: " + dto.getPhaseId()));
 
         if (assignmentRepository.existsByStudent_StudentIdAndPhase_PhaseId(dto.getStudentId(), dto.getPhaseId())) {
             throw new DuplicateResourceException("Student is already assigned to a mentor in this phase");
@@ -97,8 +95,20 @@ public class InternshipAssignmentService {
 
     @Transactional
     public InternshipAssignmentDTO updateStatus(Integer assignmentId, AssignmentStatus status) {
+        if (status == null) {
+            throw new BadRequestException("Status is required");
+        }
+
         InternshipAssignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found with id: " + assignmentId));
+
+        UserPrincipal current = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (current.getRole() == UserRole.STUDENT) {
+            throw new AccessDeniedException("Students are not permitted to update assignment status");
+        }
+        if (current.getRole() == UserRole.MENTOR && !assignment.getMentor().getMentorId().equals(current.getUserId())) {
+            throw new AccessDeniedException("Mentors can only update status for their assigned students");
+        }
 
         assignment.setStatus(status);
         return mapToDTO(assignmentRepository.save(assignment));

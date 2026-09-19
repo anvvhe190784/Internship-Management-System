@@ -10,6 +10,7 @@ import com.example.internship.exception.ResourceNotFoundException;
 import com.example.internship.repository.MentorRepository;
 import com.example.internship.repository.UserRepository;
 import com.example.internship.security.UserPrincipal;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,16 +31,13 @@ public class MentorService {
         this.userService = userService;
     }
 
+    @Transactional(readOnly = true)
     public List<MentorDTO> getAllMentors() {
         return mentorRepository.findAll().stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public MentorDTO getMentorById(Integer mentorId) {
-        UserPrincipal current = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (current.getRole() == UserRole.MENTOR && !current.getUserId().equals(mentorId)) {
-            throw new BadRequestException("Mentors can only view their own profile details");
-        }
-
         Mentor mentor = mentorRepository.findById(mentorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Mentor profile not found for id: " + mentorId));
         return mapToDTO(mentor);
@@ -71,12 +69,13 @@ public class MentorService {
     @Transactional
     public MentorDTO updateMentor(Integer mentorId, MentorDTO dto) {
         UserPrincipal current = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (current.getRole() == UserRole.MENTOR && !current.getUserId().equals(mentorId)) {
-            throw new BadRequestException("Mentors can only update their own profile");
+        if (current.getRole() != UserRole.ADMIN
+                && (!current.getRole().equals(UserRole.MENTOR) || !current.getUserId().equals(mentorId))) {
+            throw new AccessDeniedException("You do not have permission to update this mentor profile");
         }
 
         Mentor mentor = mentorRepository.findById(mentorId)
-                .orElseThrow(() -> new ResourceNotFoundException("Mentor not found for id: " + mentorId));
+                .orElseThrow(() -> new ResourceNotFoundException("Mentor profile not found for id: " + mentorId));
 
         mentor.setDepartment(dto.getDepartment());
         mentor.setAcademicRank(dto.getAcademicRank());

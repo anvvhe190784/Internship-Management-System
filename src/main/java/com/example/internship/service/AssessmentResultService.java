@@ -7,6 +7,7 @@ import com.example.internship.exception.DuplicateResourceException;
 import com.example.internship.exception.ResourceNotFoundException;
 import com.example.internship.repository.*;
 import com.example.internship.security.UserPrincipal;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,51 +22,54 @@ public class AssessmentResultService {
     private final InternshipAssignmentRepository assignmentRepository;
     private final AssessmentRoundRepository roundRepository;
     private final EvaluationCriteriaRepository criteriaRepository;
+    private final RoundCriteriaRepository roundCriteriaRepository;
     private final UserRepository userRepository;
 
-    public AssessmentResultService(AssessmentResultRepository resultRepository, InternshipAssignmentRepository assignmentRepository, AssessmentRoundRepository roundRepository, EvaluationCriteriaRepository criteriaRepository, UserRepository userRepository) {
+    public AssessmentResultService(AssessmentResultRepository resultRepository,
+            InternshipAssignmentRepository assignmentRepository,
+            AssessmentRoundRepository roundRepository,
+            EvaluationCriteriaRepository criteriaRepository,
+            RoundCriteriaRepository roundCriteriaRepository,
+            UserRepository userRepository) {
         this.resultRepository = resultRepository;
         this.assignmentRepository = assignmentRepository;
         this.roundRepository = roundRepository;
         this.criteriaRepository = criteriaRepository;
+        this.roundCriteriaRepository = roundCriteriaRepository;
         this.userRepository = userRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<AssessmentResultDTO> getResults(Integer assignmentId, Integer roundId) {
         UserPrincipal current = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        List<AssessmentResult> list;
-        if (assignmentId != null && roundId != null) {
-            list = resultRepository.findByAssignment_AssignmentIdAndRound_RoundId(assignmentId, roundId);
-        } else if (assignmentId != null) {
-            list = resultRepository.findByAssignment_AssignmentId(assignmentId);
-        } else {
-            list = resultRepository.findAll();
-        }
+        Integer studentFilter = null;
+        Integer mentorFilter = null;
 
         if (current.getRole() == UserRole.STUDENT) {
-            list = list.stream()
-                    .filter(r -> r.getAssignment().getStudent().getStudentId().equals(current.getUserId()))
-                    .collect(Collectors.toList());
+            studentFilter = current.getUserId();
         } else if (current.getRole() == UserRole.MENTOR) {
-            list = list.stream()
-                    .filter(r -> r.getAssignment().getMentor().getMentorId().equals(current.getUserId()))
-                    .collect(Collectors.toList());
+            mentorFilter = current.getUserId();
         }
 
+        List<AssessmentResult> list = resultRepository.findWithFilters(assignmentId, roundId, studentFilter,
+                mentorFilter);
         return list.stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public AssessmentResultDTO getResultById(Integer resultId) {
         AssessmentResult result = resultRepository.findById(resultId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assessment result not found with id: " + resultId));
 
         UserPrincipal current = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (current.getRole() == UserRole.STUDENT && !result.getAssignment().getStudent().getStudentId().equals(current.getUserId())) {
-            throw new BadRequestException("Students can only view their own assessment results");
+        if (current.getRole() == UserRole.STUDENT
+                && !result.getAssignment().getStudent().getStudentId().equals(current.getUserId())) {
+            throw new AccessDeniedException("Students can only view their own assessment results");
         }
-        if (current.getRole() == UserRole.MENTOR && !result.getAssignment().getMentor().getMentorId().equals(current.getUserId())) {
-            throw new BadRequestException("Mentors can only view assessment results of their assigned students");
+        if (current.getRole() == UserRole.MENTOR
+                && !result.getAssignment().getMentor().getMentorId().equals(current.getUserId())) {
+            throw new AccessDeniedException("Mentors can only view assessment results of their assigned students");
         }
 
         return mapToDTO(result);
@@ -75,26 +79,45 @@ public class AssessmentResultService {
     public AssessmentResultDTO evaluateCriterion(AssessmentResultDTO dto) {
         UserPrincipal current = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
+        if (current.getRole() == UserRole.STUDENT) {
+            throw new AccessDeniedException("Students are not permitted to evaluate assessments");
+        }
+
         InternshipAssignment assignment = assignmentRepository.findById(dto.getAssignmentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Assignment not found with id: " + dto.getAssignmentId()));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Assignment not found with id: " + dto.getAssignmentId()));
 
         if (current.getRole() == UserRole.MENTOR && !assignment.getMentor().getMentorId().equals(current.getUserId())) {
-            throw new BadRequestException("Mentors can only evaluate students assigned to them");
+            throw new AccessDeniedException("Mentors can only evaluate students assigned to them");
         }
 
         AssessmentRound round = roundRepository.findById(dto.getRoundId())
-                .orElseThrow(() -> new ResourceNotFoundException("Assessment round not found with id: " + dto.getRoundId()));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Assessment round not found with id: " + dto.getRoundId()));
+
+        if (!round.getPhase().getPhaseId().equals(assignment.getPhase().getPhaseId())) {
+            throw new BadRequestException(
+                    "Assessment round does not belong to the internship phase of this assignment");
+        }
 
         EvaluationCriteria criterion = criteriaRepository.findById(dto.getCriterionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Evaluation criteria not found with id: " + dto.getCriterionId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Evaluation criteria not found with id: " + dto.getCriterionId()));
+
+        if (!roundCriteriaRepository.existsByRound_RoundIdAndCriterion_CriterionId(dto.getRoundId(),
+                dto.getCriterionId())) {
+            throw new BadRequestException("Criterion is not configured for this assessment round");
+        }
 
         if (dto.getScore().compareTo(criterion.getMaxScore()) > 0) {
-            throw new BadRequestException("Score (" + dto.getScore() + ") cannot exceed maximum score (" + criterion.getMaxScore() + ")");
+            throw new BadRequestException(
+                    "Score (" + dto.getScore() + ") cannot exceed maximum score (" + criterion.getMaxScore() + ")");
         }
 
         if (resultRepository.existsByAssignment_AssignmentIdAndRound_RoundIdAndCriterion_CriterionId(
                 dto.getAssignmentId(), dto.getRoundId(), dto.getCriterionId())) {
-            throw new DuplicateResourceException("This criterion has already been evaluated for this student in this round");
+            throw new DuplicateResourceException(
+                    "This criterion has already been evaluated for this student in this round");
         }
 
         User evaluator = userRepository.findById(current.getUserId())
@@ -116,15 +139,21 @@ public class AssessmentResultService {
     public AssessmentResultDTO updateEvaluation(Integer resultId, AssessmentResultDTO dto) {
         UserPrincipal current = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
+        if (current.getRole() == UserRole.STUDENT) {
+            throw new AccessDeniedException("Students are not permitted to update assessment results");
+        }
+
         AssessmentResult result = resultRepository.findById(resultId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assessment result not found with id: " + resultId));
 
-        if (current.getRole() == UserRole.MENTOR && !result.getAssignment().getMentor().getMentorId().equals(current.getUserId())) {
-            throw new BadRequestException("Mentors can only update evaluations for their assigned students");
+        if (current.getRole() == UserRole.MENTOR
+                && !result.getAssignment().getMentor().getMentorId().equals(current.getUserId())) {
+            throw new AccessDeniedException("Mentors can only update evaluations for their assigned students");
         }
 
         if (dto.getScore().compareTo(result.getCriterion().getMaxScore()) > 0) {
-            throw new BadRequestException("Score cannot exceed maximum score (" + result.getCriterion().getMaxScore() + ")");
+            throw new BadRequestException(
+                    "Score cannot exceed maximum score (" + result.getCriterion().getMaxScore() + ")");
         }
 
         result.setScore(dto.getScore());

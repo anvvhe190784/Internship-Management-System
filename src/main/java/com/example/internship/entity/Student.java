@@ -38,7 +38,7 @@ public class Student {
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
-    @Column(name = "address", columnDefinition = "TEXT")
+    @Column(name = "address", length = 255)
     private String address;
 
     @CreationTimestamp

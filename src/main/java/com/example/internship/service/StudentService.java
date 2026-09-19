@@ -11,6 +11,7 @@ import com.example.internship.exception.ResourceNotFoundException;
 import com.example.internship.repository.StudentRepository;
 import com.example.internship.repository.UserRepository;
 import com.example.internship.security.UserPrincipal;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,14 +32,16 @@ public class StudentService {
         this.userService = userService;
     }
 
+    @Transactional(readOnly = true)
     public List<StudentDTO> getAllStudents() {
         return studentRepository.findAll().stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public StudentDTO getStudentById(Integer studentId) {
         UserPrincipal current = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (current.getRole() == UserRole.STUDENT && !current.getUserId().equals(studentId)) {
-            throw new BadRequestException("Students can only view their own profile");
+            throw new AccessDeniedException("Students can only view their own profile");
         }
 
         Student student = studentRepository.findById(studentId)
@@ -79,14 +82,16 @@ public class StudentService {
     @Transactional
     public StudentDTO updateStudent(Integer studentId, StudentDTO dto) {
         UserPrincipal current = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (current.getRole() == UserRole.STUDENT && !current.getUserId().equals(studentId)) {
-            throw new BadRequestException("Students can only update their own profile");
+        if (current.getRole() != UserRole.ADMIN
+                && (!current.getRole().equals(UserRole.STUDENT) || !current.getUserId().equals(studentId))) {
+            throw new AccessDeniedException("You do not have permission to update this student profile");
         }
 
         Student student = studentRepository.findById(studentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Student not found for id: " + studentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Student profile not found for id: " + studentId));
 
-        if (!student.getStudentCode().equalsIgnoreCase(dto.getStudentCode()) && studentRepository.existsByStudentCode(dto.getStudentCode())) {
+        if (!student.getStudentCode().equalsIgnoreCase(dto.getStudentCode())
+                && studentRepository.existsByStudentCode(dto.getStudentCode())) {
             throw new DuplicateResourceException("Student code already exists: " + dto.getStudentCode());
         }
 

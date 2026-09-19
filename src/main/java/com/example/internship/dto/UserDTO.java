@@ -21,6 +21,7 @@ public class UserDTO {
     @NotBlank(message = "Username is required")
     private String username;
 
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     @NotBlank(message = "Full name is required")

@@ -4,11 +4,10 @@ import com.example.internship.dto.ApiResponse;
 import com.example.internship.dto.StudentDTO;
 import com.example.internship.service.StudentService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/students")
@@ -33,13 +32,16 @@ public class StudentController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<StudentDTO>> createStudent(@Valid @RequestBody StudentDTO studentDTO) {
+    public ResponseEntity<ApiResponse<StudentDTO>> createStudent(
+            @Valid @RequestBody StudentDTO studentDTO) {
         StudentDTO created = studentService.createStudent(studentDTO);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Student profile created", created));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Student profile created", created));
     }
 
     @PutMapping("/{studentId}")
-    public ResponseEntity<ApiResponse<StudentDTO>> updateStudent(@PathVariable Integer studentId, @Valid @RequestBody StudentDTO studentDTO) {
+    public ResponseEntity<ApiResponse<StudentDTO>> updateStudent(
+            @PathVariable Integer studentId, @Valid @RequestBody StudentDTO studentDTO) {
         StudentDTO updated = studentService.updateStudent(studentId, studentDTO);
         return ResponseEntity.ok(ApiResponse.success("Student profile updated", updated));
     }

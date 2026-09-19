@@ -10,7 +10,7 @@ import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "assessment_results", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"assignment_id", "round_id", "criterion_id"})
+        @UniqueConstraint(columnNames = { "assignment_id", "round_id", "criterion_id" })
 })
 @Getter
 @Setter

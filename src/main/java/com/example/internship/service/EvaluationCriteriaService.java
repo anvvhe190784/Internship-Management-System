@@ -20,13 +20,16 @@ public class EvaluationCriteriaService {
         this.criteriaRepository = criteriaRepository;
     }
 
+    @Transactional(readOnly = true)
     public List<EvaluationCriteriaDTO> getAllCriteria() {
         return criteriaRepository.findAll().stream().map(this::mapToDTO).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public EvaluationCriteriaDTO getCriterionById(Integer criterionId) {
         EvaluationCriteria criteria = criteriaRepository.findById(criterionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Evaluation criteria not found with id: " + criterionId));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Evaluation criteria not found with id: " + criterionId));
         return mapToDTO(criteria);
     }
 
@@ -48,9 +51,11 @@ public class EvaluationCriteriaService {
     @Transactional
     public EvaluationCriteriaDTO updateCriterion(Integer criterionId, EvaluationCriteriaDTO dto) {
         EvaluationCriteria criteria = criteriaRepository.findById(criterionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Evaluation criteria not found with id: " + criterionId));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Evaluation criteria not found with id: " + criterionId));
 
-        if (!criteria.getCriterionName().equalsIgnoreCase(dto.getCriterionName()) && criteriaRepository.existsByCriterionName(dto.getCriterionName())) {
+        if (!criteria.getCriterionName().equalsIgnoreCase(dto.getCriterionName())
+                && criteriaRepository.existsByCriterionName(dto.getCriterionName())) {
             throw new DuplicateResourceException("Criterion name already exists: " + dto.getCriterionName());
         }
 
@@ -64,7 +69,8 @@ public class EvaluationCriteriaService {
     @Transactional
     public void deleteCriterion(Integer criterionId) {
         EvaluationCriteria criteria = criteriaRepository.findById(criterionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Evaluation criteria not found with id: " + criterionId));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Evaluation criteria not found with id: " + criterionId));
         criteriaRepository.delete(criteria);
     }
 

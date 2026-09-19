@@ -22,7 +22,7 @@ public class EvaluationCriteria {
     @Column(name = "criterion_id")
     private Integer criterionId;
 
-    @Column(name = "criterion_name", nullable = false, unique = true, length = 100)
+    @Column(name = "criterion_name", nullable = false, unique = true, length = 200)
     private String criterionName;
 
     @Column(name = "description", columnDefinition = "TEXT")
