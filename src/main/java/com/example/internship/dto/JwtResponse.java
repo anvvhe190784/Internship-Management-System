@@ -11,11 +11,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class JwtResponse {
-    private String token;
-    @Builder.Default
-    private String tokenType = "Bearer";
-    private Integer userId;
-    private String username;
-    private String email;
-    private UserRole role;
+  private String token;
+  @Builder.Default private String tokenType = "Bearer";
+  private Integer userId;
+  private String username;
+  private String email;
+  private UserRole role;
 }

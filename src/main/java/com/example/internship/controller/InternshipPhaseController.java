@@ -13,43 +13,43 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/internship_phases")
 public class InternshipPhaseController {
 
-    private final InternshipPhaseService phaseService;
+  private final InternshipPhaseService phaseService;
 
-    public InternshipPhaseController(InternshipPhaseService phaseService) {
-        this.phaseService = phaseService;
-    }
+  public InternshipPhaseController(InternshipPhaseService phaseService) {
+    this.phaseService = phaseService;
+  }
 
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<InternshipPhaseDTO>>> getAllPhases() {
-        List<InternshipPhaseDTO> phases = phaseService.getAllPhases();
-        return ResponseEntity.ok(ApiResponse.success(phases));
-    }
+  @GetMapping
+  public ResponseEntity<ApiResponse<List<InternshipPhaseDTO>>> getAllPhases() {
+    List<InternshipPhaseDTO> phases = phaseService.getAllPhases();
+    return ResponseEntity.ok(ApiResponse.success(phases));
+  }
 
-    @GetMapping("/{phaseId}")
-    public ResponseEntity<ApiResponse<InternshipPhaseDTO>> getPhaseById(
-            @PathVariable Integer phaseId) {
-        InternshipPhaseDTO phase = phaseService.getPhaseById(phaseId);
-        return ResponseEntity.ok(ApiResponse.success(phase));
-    }
+  @GetMapping("/{phaseId}")
+  public ResponseEntity<ApiResponse<InternshipPhaseDTO>> getPhaseById(
+      @PathVariable Integer phaseId) {
+    InternshipPhaseDTO phase = phaseService.getPhaseById(phaseId);
+    return ResponseEntity.ok(ApiResponse.success(phase));
+  }
 
-    @PostMapping
-    public ResponseEntity<ApiResponse<InternshipPhaseDTO>> createPhase(
-            @Valid @RequestBody InternshipPhaseDTO dto) {
-        InternshipPhaseDTO created = phaseService.createPhase(dto);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Internship phase created", created));
-    }
+  @PostMapping
+  public ResponseEntity<ApiResponse<InternshipPhaseDTO>> createPhase(
+      @Valid @RequestBody InternshipPhaseDTO dto) {
+    InternshipPhaseDTO created = phaseService.createPhase(dto);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success(201, "Internship phase created", created));
+  }
 
-    @PutMapping("/{phaseId}")
-    public ResponseEntity<ApiResponse<InternshipPhaseDTO>> updatePhase(
-            @PathVariable Integer phaseId, @Valid @RequestBody InternshipPhaseDTO dto) {
-        InternshipPhaseDTO updated = phaseService.updatePhase(phaseId, dto);
-        return ResponseEntity.ok(ApiResponse.success("Internship phase updated", updated));
-    }
+  @PutMapping("/{phaseId}")
+  public ResponseEntity<ApiResponse<InternshipPhaseDTO>> updatePhase(
+      @PathVariable Integer phaseId, @Valid @RequestBody InternshipPhaseDTO dto) {
+    InternshipPhaseDTO updated = phaseService.updatePhase(phaseId, dto);
+    return ResponseEntity.ok(ApiResponse.success("Internship phase updated", updated));
+  }
 
-    @DeleteMapping("/{phaseId}")
-    public ResponseEntity<ApiResponse<Void>> deletePhase(@PathVariable Integer phaseId) {
-        phaseService.deletePhase(phaseId);
-        return ResponseEntity.ok(ApiResponse.success("Internship phase deleted", null));
-    }
+  @DeleteMapping("/{phaseId}")
+  public ResponseEntity<ApiResponse<Void>> deletePhase(@PathVariable Integer phaseId) {
+    phaseService.deletePhase(phaseId);
+    return ResponseEntity.ok(ApiResponse.success("Internship phase deleted", null));
+  }
 }

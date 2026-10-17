@@ -8,114 +8,168 @@ import com.example.internship.entity.UserRole;
 import com.example.internship.exception.BadRequestException;
 import com.example.internship.exception.DuplicateResourceException;
 import com.example.internship.exception.ResourceNotFoundException;
+import com.example.internship.repository.InternshipAssignmentRepository;
 import com.example.internship.repository.StudentRepository;
 import com.example.internship.repository.UserRepository;
 import com.example.internship.security.UserPrincipal;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
 @Service
 public class StudentService {
 
-    private final StudentRepository studentRepository;
-    private final UserRepository userRepository;
-    private final UserService userService;
+  private final StudentRepository studentRepository;
+  private final UserRepository userRepository;
+  private final UserService userService;
+  private final InternshipAssignmentRepository assignmentRepository;
 
-    public StudentService(StudentRepository studentRepository, UserRepository userRepository, UserService userService) {
-        this.studentRepository = studentRepository;
-        this.userRepository = userRepository;
-        this.userService = userService;
+  public StudentService(
+      StudentRepository studentRepository,
+      UserRepository userRepository,
+      UserService userService,
+      InternshipAssignmentRepository assignmentRepository) {
+    this.studentRepository = studentRepository;
+    this.userRepository = userRepository;
+    this.userService = userService;
+    this.assignmentRepository = assignmentRepository;
+  }
+
+  @Transactional(readOnly = true)
+  public List<StudentDTO> getAllStudents() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth != null
+        && auth.getPrincipal() instanceof UserPrincipal current
+        && current.getRole() == UserRole.MENTOR) {
+      return studentRepository.findAssignedStudentsByMentorId(current.getUserId()).stream()
+          .map(this::mapToDTO)
+          .collect(Collectors.toList());
+    }
+    return studentRepository.findAll().stream().map(this::mapToDTO).collect(Collectors.toList());
+  }
+
+  @Transactional(readOnly = true)
+  public StudentDTO getStudentById(Integer studentId) {
+    UserPrincipal current = UserPrincipal.current();
+    if (current.getRole() == UserRole.STUDENT && !current.getUserId().equals(studentId)) {
+      throw new AccessDeniedException("Students can only view their own profile");
+    }
+    if (current.getRole() == UserRole.MENTOR
+        && !assignmentRepository.existsByStudent_StudentIdAndMentor_MentorId(
+            studentId, current.getUserId())) {
+      throw new AccessDeniedException("Mentors can only view students assigned to them");
     }
 
-    @Transactional(readOnly = true)
-    public List<StudentDTO> getAllStudents() {
-        return studentRepository.findAll().stream().map(this::mapToDTO).collect(Collectors.toList());
+    Student student =
+        studentRepository
+            .findById(studentId)
+            .orElseThrow(
+                () ->
+                    new ResourceNotFoundException(
+                        "Student profile not found for id: " + studentId));
+    return mapToDTO(student);
+  }
+
+  @Transactional
+  public StudentDTO createStudent(StudentDTO dto) {
+    if (dto.getStudentId() == null) {
+      throw new BadRequestException("Student User ID is required");
     }
 
-    @Transactional(readOnly = true)
-    public StudentDTO getStudentById(Integer studentId) {
-        UserPrincipal current = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (current.getRole() == UserRole.STUDENT && !current.getUserId().equals(studentId)) {
-            throw new AccessDeniedException("Students can only view their own profile");
-        }
+    User user =
+        userRepository
+            .findById(dto.getStudentId())
+            .orElseThrow(
+                () ->
+                    new ResourceNotFoundException("User not found for id: " + dto.getStudentId()));
 
-        Student student = studentRepository.findById(studentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Student profile not found for id: " + studentId));
-        return mapToDTO(student);
+    if (user.getRole() != UserRole.STUDENT) {
+      throw new BadRequestException("User must have STUDENT role to create student profile");
     }
 
-    @Transactional
-    public StudentDTO createStudent(StudentDTO dto) {
-        if (dto.getStudentId() == null) {
-            throw new BadRequestException("Student User ID is required");
-        }
-
-        User user = userRepository.findById(dto.getStudentId())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found for id: " + dto.getStudentId()));
-
-        if (user.getRole() != UserRole.STUDENT) {
-            throw new BadRequestException("User must have STUDENT role to create student profile");
-        }
-
-        if (studentRepository.existsByStudentCode(dto.getStudentCode())) {
-            throw new DuplicateResourceException("Student code already exists: " + dto.getStudentCode());
-        }
-
-        Student student = Student.builder()
-                .studentId(user.getUserId())
-                .user(user)
-                .studentCode(dto.getStudentCode())
-                .major(dto.getMajor())
-                .className(dto.getClassName())
-                .dateOfBirth(dto.getDateOfBirth())
-                .address(dto.getAddress())
-                .build();
-
-        return mapToDTO(studentRepository.save(student));
+    if (studentRepository.existsById(dto.getStudentId())) {
+      throw new DuplicateResourceException(
+          "Student profile already exists for user id: " + dto.getStudentId());
     }
 
-    @Transactional
-    public StudentDTO updateStudent(Integer studentId, StudentDTO dto) {
-        UserPrincipal current = (UserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (current.getRole() != UserRole.ADMIN
-                && (!current.getRole().equals(UserRole.STUDENT) || !current.getUserId().equals(studentId))) {
-            throw new AccessDeniedException("You do not have permission to update this student profile");
-        }
-
-        Student student = studentRepository.findById(studentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Student profile not found for id: " + studentId));
-
-        if (!student.getStudentCode().equalsIgnoreCase(dto.getStudentCode())
-                && studentRepository.existsByStudentCode(dto.getStudentCode())) {
-            throw new DuplicateResourceException("Student code already exists: " + dto.getStudentCode());
-        }
-
-        student.setStudentCode(dto.getStudentCode());
-        student.setMajor(dto.getMajor());
-        student.setClassName(dto.getClassName());
-        student.setDateOfBirth(dto.getDateOfBirth());
-        student.setAddress(dto.getAddress());
-
-        return mapToDTO(studentRepository.save(student));
+    if (!org.springframework.util.StringUtils.hasText(dto.getStudentCode())) {
+      throw new BadRequestException("Student code is required");
     }
 
-    public StudentDTO mapToDTO(Student student) {
-        UserDTO userDTO = userService.mapToDTO(student.getUser());
-        return StudentDTO.builder()
-                .studentId(student.getStudentId())
-                .user(userDTO)
-                .studentCode(student.getStudentCode())
-                .major(student.getMajor())
-                .className(student.getClassName())
-                .dateOfBirth(student.getDateOfBirth())
-                .address(student.getAddress())
-                .createdAt(student.getCreatedAt())
-                .updatedAt(student.getUpdatedAt())
-                .build();
+    if (studentRepository.existsByStudentCode(dto.getStudentCode())) {
+      throw new DuplicateResourceException("Student code already exists: " + dto.getStudentCode());
     }
+
+    Student student =
+        Student.builder()
+            .studentId(user.getUserId())
+            .user(user)
+            .studentCode(dto.getStudentCode())
+            .major(dto.getMajor())
+            .className(dto.getClassName())
+            .dateOfBirth(dto.getDateOfBirth())
+            .address(dto.getAddress())
+            .build();
+
+    return mapToDTO(studentRepository.save(student));
+  }
+
+  @Transactional
+  public StudentDTO updateStudent(Integer studentId, StudentDTO dto) {
+    UserPrincipal current = UserPrincipal.current();
+    if (current.getRole() != UserRole.ADMIN
+        && (!current.getRole().equals(UserRole.STUDENT)
+            || !current.getUserId().equals(studentId))) {
+      throw new AccessDeniedException("You do not have permission to update this student profile");
+    }
+
+    Student student =
+        studentRepository
+            .findById(studentId)
+            .orElseThrow(
+                () ->
+                    new ResourceNotFoundException(
+                        "Student profile not found for id: " + studentId));
+
+    if (current.getRole() == UserRole.STUDENT
+        && dto.getStudentCode() != null
+        && !dto.getStudentCode().equals(student.getStudentCode())) {
+      throw new AccessDeniedException("Students cannot change their student code");
+    }
+
+    if (current.getRole() == UserRole.ADMIN && dto.getStudentCode() != null) {
+      if (!student.getStudentCode().equalsIgnoreCase(dto.getStudentCode())
+          && studentRepository.existsByStudentCode(dto.getStudentCode())) {
+        throw new DuplicateResourceException(
+            "Student code already exists: " + dto.getStudentCode());
+      }
+      student.setStudentCode(dto.getStudentCode());
+    }
+
+    student.setMajor(dto.getMajor());
+    student.setClassName(dto.getClassName());
+    student.setDateOfBirth(dto.getDateOfBirth());
+    student.setAddress(dto.getAddress());
+
+    return mapToDTO(studentRepository.save(student));
+  }
+
+  public StudentDTO mapToDTO(Student student) {
+    UserDTO userDTO = userService.mapToDTO(student.getUser());
+    return StudentDTO.builder()
+        .studentId(student.getStudentId())
+        .user(userDTO)
+        .studentCode(student.getStudentCode())
+        .major(student.getMajor())
+        .className(student.getClassName())
+        .dateOfBirth(student.getDateOfBirth())
+        .address(student.getAddress())
+        .createdAt(student.getCreatedAt())
+        .updatedAt(student.getUpdatedAt())
+        .build();
+  }
 }

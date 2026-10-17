@@ -13,22 +13,22 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private final AuthService authService;
+  private final AuthService authService;
 
-    public AuthController(AuthService authService) {
-        this.authService = authService;
-    }
+  public AuthController(AuthService authService) {
+    this.authService = authService;
+  }
 
-    @PostMapping("/login")
-    public ResponseEntity<ApiResponse<JwtResponse>> login(
-            @Valid @RequestBody LoginRequest loginRequest) {
-        JwtResponse jwtResponse = authService.login(loginRequest);
-        return ResponseEntity.ok(ApiResponse.success("Login successful", jwtResponse));
-    }
+  @PostMapping("/login")
+  public ResponseEntity<ApiResponse<JwtResponse>> login(
+      @Valid @RequestBody LoginRequest loginRequest) {
+    JwtResponse jwtResponse = authService.login(loginRequest);
+    return ResponseEntity.ok(ApiResponse.success("Login successful", jwtResponse));
+  }
 
-    @GetMapping("/me")
-    public ResponseEntity<ApiResponse<UserDTO>> getCurrentUser() {
-        UserDTO userDTO = authService.getCurrentUser();
-        return ResponseEntity.ok(ApiResponse.success(userDTO));
-    }
+  @GetMapping("/me")
+  public ResponseEntity<ApiResponse<UserDTO>> getCurrentUser() {
+    UserDTO userDTO = authService.getCurrentUser();
+    return ResponseEntity.ok(ApiResponse.success(userDTO));
+  }
 }

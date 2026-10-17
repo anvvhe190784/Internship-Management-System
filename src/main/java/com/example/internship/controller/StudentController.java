@@ -13,36 +13,36 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/students")
 public class StudentController {
 
-    private final StudentService studentService;
+  private final StudentService studentService;
 
-    public StudentController(StudentService studentService) {
-        this.studentService = studentService;
-    }
+  public StudentController(StudentService studentService) {
+    this.studentService = studentService;
+  }
 
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<StudentDTO>>> getAllStudents() {
-        List<StudentDTO> students = studentService.getAllStudents();
-        return ResponseEntity.ok(ApiResponse.success(students));
-    }
+  @GetMapping
+  public ResponseEntity<ApiResponse<List<StudentDTO>>> getAllStudents() {
+    List<StudentDTO> students = studentService.getAllStudents();
+    return ResponseEntity.ok(ApiResponse.success(students));
+  }
 
-    @GetMapping("/{studentId}")
-    public ResponseEntity<ApiResponse<StudentDTO>> getStudentById(@PathVariable Integer studentId) {
-        StudentDTO student = studentService.getStudentById(studentId);
-        return ResponseEntity.ok(ApiResponse.success(student));
-    }
+  @GetMapping("/{studentId}")
+  public ResponseEntity<ApiResponse<StudentDTO>> getStudentById(@PathVariable Integer studentId) {
+    StudentDTO student = studentService.getStudentById(studentId);
+    return ResponseEntity.ok(ApiResponse.success(student));
+  }
 
-    @PostMapping
-    public ResponseEntity<ApiResponse<StudentDTO>> createStudent(
-            @Valid @RequestBody StudentDTO studentDTO) {
-        StudentDTO created = studentService.createStudent(studentDTO);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Student profile created", created));
-    }
+  @PostMapping
+  public ResponseEntity<ApiResponse<StudentDTO>> createStudent(
+      @Valid @RequestBody StudentDTO studentDTO) {
+    StudentDTO created = studentService.createStudent(studentDTO);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success(201, "Student profile created", created));
+  }
 
-    @PutMapping("/{studentId}")
-    public ResponseEntity<ApiResponse<StudentDTO>> updateStudent(
-            @PathVariable Integer studentId, @Valid @RequestBody StudentDTO studentDTO) {
-        StudentDTO updated = studentService.updateStudent(studentId, studentDTO);
-        return ResponseEntity.ok(ApiResponse.success("Student profile updated", updated));
-    }
+  @PutMapping("/{studentId}")
+  public ResponseEntity<ApiResponse<StudentDTO>> updateStudent(
+      @PathVariable Integer studentId, @Valid @RequestBody StudentDTO studentDTO) {
+    StudentDTO updated = studentService.updateStudent(studentId, studentDTO);
+    return ResponseEntity.ok(ApiResponse.success("Student profile updated", updated));
+  }
 }

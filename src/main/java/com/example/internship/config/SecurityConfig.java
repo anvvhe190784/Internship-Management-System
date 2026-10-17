@@ -2,6 +2,7 @@ package com.example.internship.config;
 
 import com.example.internship.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,144 +28,155 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+  private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-    }
+  public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+  }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+  @Bean
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+  }
 
-    @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration authenticationConfiguration) throws Exception {
-        return authenticationConfiguration.getAuthenticationManager();
-    }
+  @Bean
+  public AuthenticationManager authenticationManager(
+      AuthenticationConfiguration authenticationConfiguration) throws Exception {
+    return authenticationConfiguration.getAuthenticationManager();
+  }
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowCredentials(true);
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
+  @Bean
+  public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration configuration = new CorsConfiguration();
+    configuration.setAllowedOriginPatterns(List.of("*"));
+    configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+    configuration.setAllowedHeaders(List.of("*"));
+    configuration.setAllowCredentials(true);
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", configuration);
+    return source;
+  }
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(
-                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(
-                        exceptions -> exceptions
-                                .authenticationEntryPoint(
-                                        (request, response, authException) -> {
-                                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                                            String msg = authException.getMessage() != null
-                                                    ? authException.getMessage().replace("\"", "\\\"")
-                                                    : "Authentication required";
-                                            response
-                                                    .getWriter()
-                                                    .write(
-                                                            "{\"success\":false,\"message\":\"Unauthorized: "
-                                                                    + msg
-                                                                    + "\",\"data\":null}");
-                                        })
-                                .accessDeniedHandler(
-                                        (request, response, accessDeniedException) -> {
-                                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                                            response
-                                                    .getWriter()
-                                                    .write(
-                                                            "{\"success\":false,\"message\":\"Access denied: You do not have"
-                                                                    + " permission to access this resource\",\"data\":null}");
-                                        }))
-                .authorizeHttpRequests(
-                        auth -> auth
-                                // Public auth endpoints
-                                .requestMatchers("/api/auth/**")
-                                .permitAll()
+  @Bean
+  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
+        .csrf(AbstractHttpConfigurer::disable)
+        .sessionManagement(
+            session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .exceptionHandling(
+            exceptions ->
+                exceptions
+                    .authenticationEntryPoint(
+                        (request, response, authException) -> {
+                          response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                          response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                          String errorCode = (String) request.getAttribute("jwt_error_code");
+                          if (errorCode == null) {
+                            errorCode = "INVALID_JWT_TOKEN";
+                          }
+                          String timestamp = Instant.now().toString();
+                          response
+                              .getWriter()
+                              .write(
+                                  "{\"success\":false,\"status_code\":401,\"error_code\":\""
+                                      + errorCode
+                                      + "\",\"message\":\"Unauthorized: Authentication token was either missing or invalid.\",\"timestamp\":\""
+                                      + timestamp
+                                      + "\"}");
+                        })
+                    .accessDeniedHandler(
+                        (request, response, accessDeniedException) -> {
+                          response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                          response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                          String timestamp = Instant.now().toString();
+                          response
+                              .getWriter()
+                              .write(
+                                  "{\"success\":false,\"status_code\":403,\"error_code\":\"ACCESS_DENIED\",\"message\":\"Access denied: You do not have permission to access this resource\",\"timestamp\":\""
+                                      + timestamp
+                                      + "\"}");
+                        }))
+        .authorizeHttpRequests(
+            auth ->
+                auth
+                    // Public auth endpoints
+                    .requestMatchers(HttpMethod.POST, "/api/auth/login")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/auth/me")
+                    .hasAnyRole("ADMIN", "MENTOR", "STUDENT")
 
-                                // User management: Admin only
-                                .requestMatchers("/api/users/**")
-                                .hasRole("ADMIN")
+                    // User management: Admin only
+                    .requestMatchers("/api/users/**")
+                    .hasRole("ADMIN")
 
-                                // Students: Only Admin and Mentor can view all students. Student can view
-                                // individual profile
-                                .requestMatchers(HttpMethod.GET, "/api/students")
-                                .hasAnyRole("ADMIN", "MENTOR")
-                                .requestMatchers(HttpMethod.GET, "/api/students/**")
-                                .hasAnyRole("ADMIN", "MENTOR", "STUDENT")
-                                .requestMatchers(HttpMethod.POST, "/api/students/**")
-                                .hasRole("ADMIN")
-                                .requestMatchers(HttpMethod.PUT, "/api/students/**")
-                                .hasAnyRole("ADMIN", "STUDENT")
+                    // Students: Only Admin and Mentor can view all students. Student can view
+                    // individual profile
+                    .requestMatchers(HttpMethod.GET, "/api/students")
+                    .hasAnyRole("ADMIN", "MENTOR")
+                    .requestMatchers(HttpMethod.GET, "/api/students/**")
+                    .hasAnyRole("ADMIN", "MENTOR", "STUDENT")
+                    .requestMatchers(HttpMethod.POST, "/api/students/**")
+                    .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.PUT, "/api/students/**")
+                    .hasAnyRole("ADMIN", "STUDENT")
 
-                                // Mentors
-                                .requestMatchers(HttpMethod.GET, "/api/mentors/**")
-                                .hasAnyRole("ADMIN", "MENTOR", "STUDENT")
-                                .requestMatchers(HttpMethod.POST, "/api/mentors/**")
-                                .hasRole("ADMIN")
-                                .requestMatchers(HttpMethod.PUT, "/api/mentors/**")
-                                .hasAnyRole("ADMIN", "MENTOR")
+                    // Mentors
+                    .requestMatchers(HttpMethod.GET, "/api/mentors")
+                    .hasAnyRole("ADMIN", "STUDENT")
+                    .requestMatchers(HttpMethod.GET, "/api/mentors/**")
+                    .hasAnyRole("ADMIN", "MENTOR", "STUDENT")
+                    .requestMatchers(HttpMethod.POST, "/api/mentors/**")
+                    .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.PUT, "/api/mentors/**")
+                    .hasAnyRole("ADMIN", "MENTOR")
 
-                                // Phases, Criteria, Rounds, Round Criteria: Read for all, Write for Admin
-                                .requestMatchers(
-                                        HttpMethod.GET,
-                                        "/api/internship_phases/**",
-                                        "/api/evaluation_criteria/**",
-                                        "/api/assessment_rounds/**",
-                                        "/api/round_criteria/**")
-                                .hasAnyRole("ADMIN", "MENTOR", "STUDENT")
-                                .requestMatchers(
-                                        HttpMethod.POST,
-                                        "/api/internship_phases/**",
-                                        "/api/evaluation_criteria/**",
-                                        "/api/assessment_rounds/**",
-                                        "/api/round_criteria/**")
-                                .hasRole("ADMIN")
-                                .requestMatchers(
-                                        HttpMethod.PUT,
-                                        "/api/internship_phases/**",
-                                        "/api/evaluation_criteria/**",
-                                        "/api/assessment_rounds/**",
-                                        "/api/round_criteria/**")
-                                .hasRole("ADMIN")
+                    // Phases, Criteria, Rounds, Round Criteria: Read for all, Write for Admin
+                    .requestMatchers(
+                        HttpMethod.GET,
+                        "/api/internship_phases/**",
+                        "/api/evaluation_criteria/**",
+                        "/api/assessment_rounds/**",
+                        "/api/round_criteria/**")
+                    .hasAnyRole("ADMIN", "MENTOR", "STUDENT")
+                    .requestMatchers(
+                        HttpMethod.POST,
+                        "/api/internship_phases/**",
+                        "/api/evaluation_criteria/**",
+                        "/api/assessment_rounds/**",
+                        "/api/round_criteria/**")
+                    .hasRole("ADMIN")
+                    .requestMatchers(
+                        HttpMethod.PUT,
+                        "/api/internship_phases/**",
+                        "/api/evaluation_criteria/**",
+                        "/api/assessment_rounds/**",
+                        "/api/round_criteria/**")
+                    .hasRole("ADMIN")
 
-                                // Internship Assignments: Read for all, Assign for Admin, Status update for
-                                // Admin & Mentor
-                                .requestMatchers(HttpMethod.GET, "/api/internship_assignments/**")
-                                .hasAnyRole("ADMIN", "MENTOR", "STUDENT")
-                                .requestMatchers(HttpMethod.POST, "/api/internship_assignments/**")
-                                .hasRole("ADMIN")
-                                .requestMatchers(HttpMethod.PUT, "/api/internship_assignments/**")
-                                .hasAnyRole("ADMIN", "MENTOR")
+                    // Internship Assignments: Read for all, Assign for Admin, Status update for Admin only
+                    .requestMatchers(HttpMethod.GET, "/api/internship_assignments/**")
+                    .hasAnyRole("ADMIN", "MENTOR", "STUDENT")
+                    .requestMatchers(HttpMethod.POST, "/api/internship_assignments/**")
+                    .hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.PUT, "/api/internship_assignments/**")
+                    .hasRole("ADMIN")
 
-                                // Assessment Results: Read for all, Evaluate and Update for Admin & Mentor ONLY
-                                .requestMatchers(HttpMethod.GET, "/api/assessment_results/**")
-                                .hasAnyRole("ADMIN", "MENTOR", "STUDENT")
-                                .requestMatchers(HttpMethod.POST, "/api/assessment_results/**")
-                                .hasAnyRole("ADMIN", "MENTOR")
-                                .requestMatchers(HttpMethod.PUT, "/api/assessment_results/**")
-                                .hasAnyRole("ADMIN", "MENTOR")
+                    // Assessment Results: Read for all, Evaluate and Update for Mentor ONLY
+                    .requestMatchers(HttpMethod.GET, "/api/assessment_results/**")
+                    .hasAnyRole("ADMIN", "MENTOR", "STUDENT")
+                    .requestMatchers(HttpMethod.POST, "/api/assessment_results/**")
+                    .hasRole("MENTOR")
+                    .requestMatchers(HttpMethod.PUT, "/api/assessment_results/**")
+                    .hasRole("MENTOR")
 
-                                // Delete operations: Admin only
-                                .requestMatchers(HttpMethod.DELETE, "/api/**")
-                                .hasRole("ADMIN")
-                                .anyRequest()
-                                .authenticated());
+                    // Delete operations: Admin only
+                    .requestMatchers(HttpMethod.DELETE, "/api/**")
+                    .hasRole("ADMIN")
+                    .anyRequest()
+                    .authenticated());
 
-        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+    http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
-        return http.build();
-    }
+    return http.build();
+  }
 }

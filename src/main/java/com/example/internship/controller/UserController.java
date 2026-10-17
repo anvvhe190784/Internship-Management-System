@@ -5,8 +5,8 @@ import com.example.internship.dto.UserDTO;
 import com.example.internship.entity.UserRole;
 import com.example.internship.service.UserService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
-import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,68 +15,60 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/users")
 public class UserController {
 
-    private final UserService userService;
+  public record StatusUpdateRequest(@NotNull(message = "isActive is required") Boolean isActive) {}
 
-    public UserController(UserService userService) {
-        this.userService = userService;
-    }
+  public record RoleUpdateRequest(@NotNull(message = "role is required") UserRole role) {}
 
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<UserDTO>>> getAllUsers(
-            @RequestParam(required = false) UserRole role) {
-        List<UserDTO> users = userService.getAllUsers(role);
-        return ResponseEntity.ok(ApiResponse.success(users));
-    }
+  private final UserService userService;
 
-    @GetMapping("/{userId}")
-    public ResponseEntity<ApiResponse<UserDTO>> getUserById(@PathVariable Integer userId) {
-        UserDTO user = userService.getUserById(userId);
-        return ResponseEntity.ok(ApiResponse.success(user));
-    }
+  public UserController(UserService userService) {
+    this.userService = userService;
+  }
 
-    @PostMapping
-    public ResponseEntity<ApiResponse<UserDTO>> createUser(@Valid @RequestBody UserDTO userDTO) {
-        UserDTO created = userService.createUser(userDTO);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("User created successfully", created));
-    }
+  @GetMapping
+  public ResponseEntity<ApiResponse<List<UserDTO>>> getAllUsers(
+      @RequestParam(required = false) UserRole role) {
+    List<UserDTO> users = userService.getAllUsers(role);
+    return ResponseEntity.ok(ApiResponse.success(users));
+  }
 
-    @PutMapping("/{userId}")
-    public ResponseEntity<ApiResponse<UserDTO>> updateUser(
-            @PathVariable Integer userId, @Valid @RequestBody UserDTO userDTO) {
-        UserDTO updated = userService.updateUser(userId, userDTO);
-        return ResponseEntity.ok(ApiResponse.success("User updated successfully", updated));
-    }
+  @GetMapping("/{userId}")
+  public ResponseEntity<ApiResponse<UserDTO>> getUserById(@PathVariable Integer userId) {
+    UserDTO user = userService.getUserById(userId);
+    return ResponseEntity.ok(ApiResponse.success(user));
+  }
 
-    @PutMapping("/{userId}/status")
-    public ResponseEntity<ApiResponse<UserDTO>> updateStatus(@PathVariable Integer userId,
-            @RequestBody Map<String, Boolean> body) {
-        Boolean isActive = body.get("isActive");
-        UserDTO updated = userService.updateStatus(userId, isActive != null ? isActive : true);
-        return ResponseEntity.ok(ApiResponse.success("User status updated", updated));
-    }
+  @PostMapping
+  public ResponseEntity<ApiResponse<UserDTO>> createUser(@Valid @RequestBody UserDTO userDTO) {
+    UserDTO created = userService.createUser(userDTO);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success(201, "User created successfully", created));
+  }
 
-    @PutMapping("/{userId}/role")
-    public ResponseEntity<ApiResponse<UserDTO>> updateRole(
-            @PathVariable Integer userId, @RequestBody Map<String, String> body) {
-        String roleStr = body.get("role");
-        if (roleStr == null || roleStr.isBlank()) {
-            throw new com.example.internship.exception.BadRequestException("Field 'role' is required");
-        }
-        UserRole role;
-        try {
-            role = UserRole.valueOf(roleStr.trim().toUpperCase());
-        } catch (IllegalArgumentException ex) {
-            throw new com.example.internship.exception.BadRequestException(
-                    "Invalid user role: " + roleStr);
-        }
-        UserDTO updated = userService.updateRole(userId, role);
-        return ResponseEntity.ok(ApiResponse.success("User role updated", updated));
-    }
+  @PutMapping("/{userId}")
+  public ResponseEntity<ApiResponse<UserDTO>> updateUser(
+      @PathVariable Integer userId, @Valid @RequestBody UserDTO userDTO) {
+    UserDTO updated = userService.updateUser(userId, userDTO);
+    return ResponseEntity.ok(ApiResponse.success("User updated successfully", updated));
+  }
 
-    @DeleteMapping("/{userId}")
-    public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable Integer userId) {
-        userService.deleteUser(userId);
-        return ResponseEntity.ok(ApiResponse.success("User deleted successfully", null));
-    }
+  @PutMapping("/{userId}/status")
+  public ResponseEntity<ApiResponse<UserDTO>> updateStatus(
+      @PathVariable Integer userId, @Valid @RequestBody StatusUpdateRequest request) {
+    UserDTO updated = userService.updateStatus(userId, request.isActive());
+    return ResponseEntity.ok(ApiResponse.success("User status updated", updated));
+  }
+
+  @PutMapping("/{userId}/role")
+  public ResponseEntity<ApiResponse<UserDTO>> updateRole(
+      @PathVariable Integer userId, @Valid @RequestBody RoleUpdateRequest request) {
+    UserDTO updated = userService.updateRole(userId, request.role());
+    return ResponseEntity.ok(ApiResponse.success("User role updated", updated));
+  }
+
+  @DeleteMapping("/{userId}")
+  public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable Integer userId) {
+    userService.deleteUser(userId);
+    return ResponseEntity.ok(ApiResponse.success("User deleted successfully", null));
+  }
 }

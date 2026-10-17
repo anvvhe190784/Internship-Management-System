@@ -1,12 +1,11 @@
 package com.example.internship.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "internship_phases")
@@ -17,28 +16,28 @@ import java.time.OffsetDateTime;
 @Builder
 public class InternshipPhase {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "phase_id")
-    private Integer phaseId;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  @Column(name = "phase_id")
+  private Integer phaseId;
 
-    @Column(name = "phase_name", nullable = false, unique = true, length = 100)
-    private String phaseName;
+  @Column(name = "phase_name", nullable = false, unique = true, length = 100)
+  private String phaseName;
 
-    @Column(name = "start_date", nullable = false)
-    private LocalDate startDate;
+  @Column(name = "start_date", nullable = false)
+  private LocalDate startDate;
 
-    @Column(name = "end_date", nullable = false)
-    private LocalDate endDate;
+  @Column(name = "end_date", nullable = false)
+  private LocalDate endDate;
 
-    @Column(name = "description", columnDefinition = "TEXT")
-    private String description;
+  @Column(name = "description", columnDefinition = "TEXT")
+  private String description;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt;
+  @CreationTimestamp
+  @Column(name = "created_at", nullable = false, updatable = false)
+  private OffsetDateTime createdAt;
 
-    @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt;
+  @UpdateTimestamp
+  @Column(name = "updated_at", nullable = false)
+  private OffsetDateTime updatedAt;
 }
